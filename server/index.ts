@@ -1,4 +1,4 @@
-import express from "express"; 
+import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 import http from "http";
@@ -27,7 +27,7 @@ type RoomState = {
 
 const rooms = new Map<string, RoomState>();
 
-const getOrCreateRoom = (roomId: string) : RoomState => { 
+const getOrCreateRoom = (roomId: string): RoomState => {
     const existing = rooms.get(roomId);
 
     if (existing) return existing;
@@ -44,14 +44,14 @@ const getOrCreateRoom = (roomId: string) : RoomState => {
 io.on("connection", socket => {
     console.log("a user connected", socket.id);
 
-    socket.on("room:join", ({roomId, user}) => { 
+    socket.on("room:join", ({ roomId, user }) => {
         const room = getOrCreateRoom(roomId);
 
         socket.join(roomId);
         room.users.set(socket.id, user);
 
-        socket.emit("room:joined", {roomId});
-    
+        socket.emit("room:joined", { roomId });
+
         socket.emit("room:state", {
             roomId,
             code: room.code,
@@ -63,7 +63,25 @@ io.on("connection", socket => {
 
     });
 
-    socket.on("disconnect", () => { 
+    socket.on("code:change", ({ roomId, value, clientVersion }) => {
+        const room = rooms.get(roomId);
+
+        if (!room) return;
+
+        // last-write wins
+        room.code = value;
+        room.version = clientVersion + 1;
+
+        socket.to(roomId).emit("code:update", {
+            roomId,
+            value: room.code,
+            version: room.version
+        })
+
+
+    })
+
+    socket.on("disconnect", () => {
         console.log("user disconnected", socket.id);
     })
 });

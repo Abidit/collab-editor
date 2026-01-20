@@ -1,6 +1,6 @@
 export type RoomId = string;
 
-export type User = { 
+export type User = {
     id: string;
     name: string;
 }
@@ -10,20 +10,33 @@ export type RoomJoinPayload = {
     user: User;
 }
 
-export type RoomStatePayload = { 
+export type RoomStatePayload = {
     roomId: RoomId;
     code: string;
-    version: number;    
+    version: number;
     users: User[]
 }
 
+export type CodeChangePayload = {
+    roomId: RoomId;
+    value: string;
+    clientVersion: number;
+};
+
+export type CodeUpdatePayload = {
+    roomId: RoomId;
+    value: string;
+    version: number;
+};
+
 export interface ClientToServerEvents {
-    "room:join" : (payload: RoomJoinPayload) => void;
+    "room:join": (payload: RoomJoinPayload) => void;
+    "code:change": (payload: CodeChangePayload) => void;
 }
 
 export interface ServerToClientEvents {
     "room:joined": (payload: { roomId: RoomId }) => void;
     "room:state": (payload: RoomStatePayload) => void;
     "user:joined": (payload: { roomId: RoomId, user: User }) => void;
+    "code:update": (payload: CodeUpdatePayload) => void;
 }
-

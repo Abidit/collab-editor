@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { socket } from "./socket";
 import type { User } from "@collab/shared";
+import Editor from "@monaco-editor/react";
 
 export default function App() {
   const [status, setStatus] = useState("connecting...");
   const [code, setCode] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [version, setVersion] = useState(0);
+  const [roomId, setRoomId] = useState("room-1");
+
 
   useEffect(() => {
     socket.on("connect", () => setStatus(`connected ✅ (${socket.id})`));
@@ -14,6 +17,7 @@ export default function App() {
 
     socket.on("room:joined", ({ roomId }) => {
       console.log("joined room:", roomId);
+      setRoomId(roomId);
     });
 
     socket.on("room:state", ({ code, version, users }) => {
@@ -21,6 +25,12 @@ export default function App() {
       setVersion(version);
       setUsers(users);
     });
+
+    socket.on("code:update", ({ value, version }) => {
+      setCode(value);
+      setVersion(version);
+    });
+
 
     socket.on("user:joined", ({ user }) => {
       setUsers((prev) => {
@@ -36,6 +46,7 @@ export default function App() {
       socket.off("room:joined");
       socket.off("room:state");
       socket.off("user:joined");
+      socket.off("code:update");
     };
   }, []);
 
@@ -51,10 +62,31 @@ export default function App() {
       <h2>Typed Socket Test</h2>
       <p>{status}</p>
       <button onClick={join}>Join room-1</button>
+      <div style={{ height: "60vh", marginTop: 16, border: "1px solid #ddd" }}>
+        <Editor
+          height="100%"
+          defaultLanguage="javascript"
+          value={code}
+          onChange={(value) => {
+            if (value === undefined) return;
 
-      <pre>{JSON.stringify({ version, users }, null, 2)}</pre>
-      <pre>{code}</pre>
+            setCode(value);
 
+            socket.emit("code:change", {
+              roomId,
+              value,
+              clientVersion: version,
+            });
+
+            setVersion((v) => v + 1);
+          }}
+
+          options={{
+            minimap: { enabled: false },
+            fontSize: 14,
+          }}
+        />
+      </div>
     </div>
   );
 }
