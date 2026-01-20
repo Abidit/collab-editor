@@ -1,0 +1,490 @@
+@import './variables';
+@import './mixins';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  font-family: $font-family;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: $text-primary;
+  background-color: $bg-primary;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// Top Bar
+.top-bar {
+  @include glass;
+  @include elevated;
+  position: sticky;
+  top: 0;
+  z-index: $z-topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid $border-color;
+  min-height: 56px;
+
+  &__left {
+    display: flex;
+    align-items: center;
+    gap: $spacing-lg;
+    flex: 1;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+  }
+
+  &__logo {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    font-weight: 600;
+    font-size: 16px;
+    color: $text-primary;
+    text-decoration: none;
+    
+    &-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, $accent-indigo 0%, $accent-violet 100%);
+    }
+  }
+
+  &__room-name {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    color: $text-primary;
+    font-size: 14px;
+    font-weight: 500;
+    
+    input {
+      background: transparent;
+      border: 1px solid transparent;
+      color: $text-primary;
+      font-size: 14px;
+      font-weight: 500;
+      padding: $spacing-xs $spacing-sm;
+      border-radius: 4px;
+      min-width: 120px;
+      transition: all $transition-base;
+      
+      &:hover {
+        border-color: $border-color;
+      }
+      
+      &:focus {
+        outline: none;
+        border-color: $accent-indigo;
+        background: rgba(255, 255, 255, 0.03);
+      }
+    }
+  }
+
+  &__users-count {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    color: $text-secondary;
+    font-size: 13px;
+    
+    &-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: $status-connected;
+      animation: pulse 2s ease-in-out infinite;
+    }
+  }
+
+  &__status {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    font-size: 12px;
+    color: $text-muted;
+    
+    &-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      
+      &--connected {
+        background: $status-connected;
+      }
+      
+      &--reconnecting {
+        background: $status-reconnecting;
+      }
+      
+      &--offline {
+        background: $status-offline;
+      }
+    }
+  }
+
+  &__share-btn {
+    @include button-primary;
+  }
+}
+
+// Main Layout
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+// Sidebar
+.sidebar {
+  width: 280px;
+  background: $bg-surface;
+  border-right: 1px solid $border-color;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: $z-sidebar;
+
+  @media (max-width: $breakpoint-tablet) {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    height: calc(100vh - 56px);
+    transform: translateX(-100%);
+    transition: transform $transition-slow;
+    
+    &--open {
+      transform: translateX(0);
+    }
+  }
+
+  &__section {
+    padding: $spacing-lg;
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $text-muted;
+    margin-bottom: $spacing-md;
+  }
+
+  // Active Users
+  &__users {
+    &-list {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-sm;
+    }
+
+    &-item {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      padding: $spacing-sm;
+      border-radius: 6px;
+      transition: background $transition-base;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.03);
+      }
+    }
+
+    &-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      position: relative;
+      flex-shrink: 0;
+      
+      &-ring {
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        border: 2px solid;
+        opacity: 0.6;
+      }
+    }
+
+    &-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    &-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: $text-primary;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &-status {
+      font-size: 11px;
+      color: $text-muted;
+      display: flex;
+      align-items: center;
+      gap: $spacing-xs;
+      
+      &-typing {
+        @include pulse;
+        color: $text-secondary;
+      }
+    }
+
+    &-cursor-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+  }
+
+  // Rooms
+  &__rooms {
+    &-list {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-xs;
+    }
+
+    &-item {
+      padding: $spacing-sm $spacing-md;
+      border-radius: 6px;
+      font-size: 13px;
+      color: $text-secondary;
+      cursor: pointer;
+      transition: all $transition-base;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.03);
+        color: $text-primary;
+      }
+      
+      &--active {
+        background: rgba(99, 102, 241, 0.15);
+        color: $accent-indigo;
+        font-weight: 500;
+      }
+    }
+
+    &-create {
+      @include button-secondary;
+      width: 100%;
+      margin-top: $spacing-sm;
+    }
+  }
+
+  // Status
+  &__status {
+    &-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: $spacing-sm 0;
+      font-size: 12px;
+    }
+
+    &-label {
+      color: $text-muted;
+    }
+
+    &-value {
+      color: $text-secondary;
+      font-weight: 500;
+      
+      &--connected {
+        color: $status-connected;
+      }
+      
+      &--reconnecting {
+        color: $status-reconnecting;
+      }
+    }
+
+    &-timestamp {
+      font-size: 11px;
+      color: $text-muted;
+      margin-top: $spacing-xs;
+    }
+  }
+}
+
+// Editor Area
+.editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: $bg-primary;
+  position: relative;
+
+  &__container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  &__empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: $spacing-md;
+    color: $text-muted;
+    pointer-events: none;
+    
+    &-text {
+      font-size: 14px;
+    }
+  }
+}
+
+// Mobile overlay
+.sidebar-overlay {
+  display: none;
+  
+  @media (max-width: $breakpoint-tablet) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: $z-sidebar - 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity $transition-slow;
+    
+    &--visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+  }
+}
+
+// Mobile menu button
+.mobile-menu-btn {
+  display: none;
+  
+  @media (max-width: $breakpoint-tablet) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid $border-color;
+    border-radius: 6px;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: all $transition-base;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: $text-primary;
+    }
+  }
+}
+
+// Toast notifications
+.toast {
+  position: fixed;
+  bottom: $spacing-lg;
+  right: $spacing-lg;
+  background: $bg-surface;
+  border: 1px solid $border-color;
+  border-radius: 8px;
+  padding: $spacing-md;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: $z-toast;
+  @include fade-in;
+  max-width: 320px;
+  
+  &__message {
+    font-size: 13px;
+    color: $text-primary;
+  }
+}
+
+// Remote cursor styles (Monaco editor)
+.remote-selection {
+  background: color-mix(in srgb, var(--rc-color) 25%, transparent);
+}
+
+.remote-cursor-caret {
+  border-left: 2px solid var(--rc-color);
+  margin-left: -1px;
+  position: relative;
+}
+
+.remote-cursor-label {
+  color: white;
+  background: var(--rc-color);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-left: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  @include fade-in($transition-fast);
+}
+
+// Color buckets for remote cursors (using accent colors)
+.remote-color-0 { --rc-color: #{$accent-indigo}; }
+.remote-color-1 { --rc-color: #{$accent-cyan}; }
+.remote-color-2 { --rc-color: #{$accent-emerald}; }
+.remote-color-3 { --rc-color: #{$accent-amber}; }
+.remote-color-4 { --rc-color: #{$accent-violet}; }
+.remote-color-5 { --rc-color: #{$accent-rose}; }
+.remote-color-6 { --rc-color: #{$accent-indigo}; }
+.remote-color-7 { --rc-color: #{$accent-cyan}; }
+.remote-color-8 { --rc-color: #{$accent-emerald}; }
+.remote-color-9 { --rc-color: #{$accent-amber}; }
+.remote-color-10 { --rc-color: #{$accent-violet}; }
+.remote-color-11 { --rc-color: #{$accent-rose}; }

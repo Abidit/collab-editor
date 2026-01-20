@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
 import type * as monaco from "monaco-editor";
 
 import { socket } from "./socket";
 import type { CursorMovePayload, User } from "@collab/shared";
+
+import TopBar from "./components/TopBar";
+import Sidebar from "./components/Sidebar";
+import EditorArea from "./components/EditorArea";
+import Toast from "./components/Toast";
+
+interface ToastMessage {
+  id: string;
+  message: string;
+}
 
 export default function App() {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -15,13 +24,15 @@ export default function App() {
   // Throttle cursor emits (ms)
   const lastCursorSentAtRef = useRef(0);
 
-  const [status, setStatus] = useState("connecting...");
+  const [connectionStatus, setConnectionStatus] = useState<"connected" | "reconnecting" | "offline">("offline");
   const [code, setCode] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [version, setVersion] = useState(0);
-
-  // Room
   const [roomId, setRoomId] = useState("room-1");
+  const [rooms] = useState<string[]>(["room-1", "room-2", "room-3"]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [lastSync, setLastSync] = useState<Date | undefined>(undefined);
 
   // Remote cursors keyed by user.id
   const [remoteCursors, setRemoteCursors] = useState<
@@ -34,26 +45,54 @@ export default function App() {
     name: `User-${Math.floor(Math.random() * 1000)}`,
   }));
 
+  // Show toast notification
+  const showToast = (message: string) => {
+    const id = crypto.randomUUID();
+    setToasts((prev) => [...prev, { id, message }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   useEffect(() => {
-    socket.on("connect", () => setStatus(`connected ✅ (${socket.id})`));
-    socket.on("disconnect", () => setStatus("disconnected ❌"));
+    const handleConnect = () => {
+      setConnectionStatus("connected");
+      setLastSync(new Date());
+    };
+
+    const handleDisconnect = () => {
+      setConnectionStatus("offline");
+    };
+
+    // Use socket.io's built-in connection state
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      handleDisconnect();
+    }
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
 
     socket.on("room:joined", ({ roomId }) => {
       console.log("joined room:", roomId);
       setRoomId(roomId);
+      setLastSync(new Date());
     });
 
     socket.on("room:state", ({ code, version, users }) => {
       setCode(code);
       setVersion(version);
       setUsers(users);
-      // Optional: clear remote cursors when switching rooms/state
       setRemoteCursors({});
+      setLastSync(new Date());
     });
 
     socket.on("user:joined", ({ user }) => {
       setUsers((prev) => {
         if (prev.some((u) => u.id === user.id)) return prev;
+        showToast(`${user.name} joined the room`);
         return [...prev, user];
       });
     });
@@ -61,6 +100,7 @@ export default function App() {
     socket.on("code:update", ({ value, version }) => {
       setCode(value);
       setVersion(version);
+      setLastSync(new Date());
     });
 
     socket.on("cursor:update", (payload) => {
@@ -73,9 +113,20 @@ export default function App() {
       }));
     });
 
+    // Monitor connection state changes
+    const checkConnection = () => {
+      if (socket.connected) {
+        setConnectionStatus("connected");
+      } else {
+        setConnectionStatus("reconnecting");
+      }
+    };
+    const interval = setInterval(checkConnection, 1000);
+
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
+      clearInterval(interval);
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
       socket.off("room:joined");
       socket.off("room:state");
       socket.off("user:joined");
@@ -87,37 +138,55 @@ export default function App() {
   // Apply remote cursor/selection decorations whenever remote cursor state changes
   useEffect(() => {
     const editor = editorRef.current;
-    const m = monacoRef.current;
-    if (!editor || !m) return;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+
+    const colorBucketForUser = (userId: string) => {
+      // deterministic hash -> 0..11
+      let h = 0;
+      for (let i = 0; i < userId.length; i++) {
+        h = (h * 31 + userId.charCodeAt(i)) >>> 0;
+      }
+      return h % 12;
+    };
 
     const decorations = Object.values(remoteCursors).flatMap((c) => {
-      // 1) caret-like indicator at position
+      const bucket = colorBucketForUser(c.user.id);
+      const colorClass = `remote-color-${bucket}`;
+
+      // Caret + label at the cursor position
       const cursorDeco = {
-        range: new m.Range(
+        range: new monaco.Range(
           c.position.lineNumber,
           c.position.column,
           c.position.lineNumber,
           c.position.column
         ),
         options: {
-          afterContentClassName: "remote-cursor-after",
+          afterContentClassName: `remote-cursor-caret ${colorClass}`,
+          after: {
+            content: ` ${c.user.name}`,
+            inlineClassName: `remote-cursor-label ${colorClass}`,
+          },
         },
       };
 
-      // 2) selection highlight (if present)
+      // Selection highlight (if any)
       const sel = c.selection;
       const selectionDecos = sel
         ? [
-            {
-              range: new m.Range(
-                sel.startLineNumber,
-                sel.startColumn,
-                sel.endLineNumber,
-                sel.endColumn
-              ),
-              options: { className: "remote-selection" },
+          {
+            range: new monaco.Range(
+              sel.startLineNumber,
+              sel.startColumn,
+              sel.endLineNumber,
+              sel.endColumn
+            ),
+            options: {
+              className: `remote-selection ${colorClass}`,
             },
-          ]
+          },
+        ]
         : [];
 
       return [cursorDeco, ...selectionDecos];
@@ -129,87 +198,118 @@ export default function App() {
     );
   }, [remoteCursors]);
 
-  const join = () => {
+  const joinRoom = (targetRoomId?: string) => {
+    const room = targetRoomId || roomId;
     socket.emit("room:join", {
-      roomId,
+      roomId: room,
       user: me,
     });
   };
 
+  const handleRoomNameChange = (newName: string) => {
+    setRoomId(newName);
+    // Optionally emit room rename event
+  };
+
+  const handleShare = () => {
+    const url = `${window.location.origin}?room=${roomId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("Share link copied to clipboard!");
+    });
+  };
+
+  const handleCodeChange = (value: string) => {
+    setCode(value);
+    socket.emit("code:change", {
+      roomId,
+      value,
+      clientVersion: version,
+    });
+    setVersion((v) => v + 1);
+  };
+
+  const handleCursorChange = (position: monaco.Position | null, selection: monaco.Selection | null) => {
+    if (!position) return;
+
+    // Throttle to avoid flooding
+    const now = Date.now();
+    if (now - lastCursorSentAtRef.current < 50) return; // ~20fps
+    lastCursorSentAtRef.current = now;
+
+    const payload: CursorMovePayload = {
+      roomId,
+      user: me,
+      position: { lineNumber: position.lineNumber, column: position.column },
+      selection: selection
+        ? {
+          startLineNumber: selection.startLineNumber,
+          startColumn: selection.startColumn,
+          endLineNumber: selection.endLineNumber,
+          endColumn: selection.endColumn,
+        }
+        : null,
+    };
+
+    socket.emit("cursor:move", payload);
+  };
+
+  const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    // Auto-join on mount
+    joinRoom();
+  };
+
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Collaborative Editor (MVP)</h2>
-      <p>{status}</p>
+    <div className="app">
+      <TopBar
+        roomName={roomId}
+        onRoomNameChange={handleRoomNameChange}
+        users={users}
+        status={connectionStatus}
+        onShare={handleShare}
+        onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button onClick={join}>Join {roomId}</button>
-        <span style={{ opacity: 0.8 }}>
-          Me: <b>{me.name}</b>
-        </span>
-        <span style={{ opacity: 0.8 }}>
-          Users: <b>{users.length}</b>
-        </span>
-        <span style={{ opacity: 0.8 }}>
-          Version: <b>{version}</b>
-        </span>
-      </div>
-
-      <div style={{ height: "60vh", marginTop: 16, border: "1px solid #ddd" }}>
-        <Editor
-          height="100%"
-          defaultLanguage="javascript"
-          value={code}
-          onMount={(editor, monaco) => {
-            editorRef.current = editor;
-            monacoRef.current = monaco;
-
-            // Cursor / selection broadcasting
-            editor.onDidChangeCursorSelection(() => {
-              // throttle to avoid flooding
-              const now = Date.now();
-              if (now - lastCursorSentAtRef.current < 50) return; // ~20fps
-              lastCursorSentAtRef.current = now;
-
-              const pos = editor.getPosition();
-              const sel = editor.getSelection();
-              if (!pos) return;
-
-              const payload: CursorMovePayload = {
-                roomId,
-                user: me,
-                position: { lineNumber: pos.lineNumber, column: pos.column },
-                selection: sel
-                  ? {
-                      startLineNumber: sel.startLineNumber,
-                      startColumn: sel.startColumn,
-                      endLineNumber: sel.endLineNumber,
-                      endColumn: sel.endColumn,
-                    }
-                  : null,
-              };
-
-              socket.emit("cursor:move", payload);
-            });
+      <div className="main-layout">
+        <Sidebar
+          users={users}
+          currentUser={me}
+          roomId={roomId}
+          rooms={rooms}
+          status={connectionStatus}
+          lastSync={lastSync}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onRoomSelect={(room) => {
+            joinRoom(room);
+            setSidebarOpen(false);
           }}
-          onChange={(value) => {
-            if (value === undefined) return;
-
-            setCode(value);
-
-            socket.emit("code:change", {
-              roomId,
-              value,
-              clientVersion: version,
-            });
-
-            setVersion((v) => v + 1);
-          }}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 14,
+          onCreateRoom={() => {
+            const newRoom = `room-${Date.now()}`;
+            joinRoom(newRoom);
+            showToast(`Created room: ${newRoom}`);
           }}
         />
+
+        <EditorArea
+          code={code}
+          onChange={handleCodeChange}
+          onCursorChange={handleCursorChange}
+          onMount={handleEditorMount}
+          language="javascript"
+        />
       </div>
+
+      {/* Toast notifications */}
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
     </div>
   );
 }

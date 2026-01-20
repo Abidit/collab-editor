@@ -67,12 +67,39 @@ button:focus-visible {
   }
 }
 
+/* shared cursor visuals */
 .remote-selection {
-  background: rgba(80, 150, 255, 0.25);
+  background: color-mix(in srgb, var(--rc-color) 25%, transparent);
 }
 
-.remote-cursor-after {
-  border-left: 2px solid rgba(255, 80, 80, 0.9);
+.remote-cursor-caret {
+  border-left: 2px solid var(--rc-color);
   margin-left: -1px;
 }
 
+/* username label after the caret */
+.remote-cursor-label {
+  color: #111;
+  background: color-mix(in srgb, var(--rc-color) 25%, white);
+  border: 1px solid color-mix(in srgb, var(--rc-color) 50%, #fff);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+/* color buckets (12 distinct hues) */
+.remote-color-0  { --rc-color: hsl(0  , 85%, 60%); }
+.remote-color-1  { --rc-color: hsl(30 , 85%, 60%); }
+.remote-color-2  { --rc-color: hsl(60 , 85%, 55%); }
+.remote-color-3  { --rc-color: hsl(90 , 85%, 50%); }
+.remote-color-4  { --rc-color: hsl(120, 75%, 45%); }
+.remote-color-5  { --rc-color: hsl(150, 75%, 45%); }
+.remote-color-6  { --rc-color: hsl(180, 75%, 45%); }
+.remote-color-7  { --rc-color: hsl(210, 85%, 60%); }
+.remote-color-8  { --rc-color: hsl(240, 85%, 65%); }
+.remote-color-9  { --rc-color: hsl(270, 85%, 65%); }
+.remote-color-10 { --rc-color: hsl(300, 85%, 60%); }
+.remote-color-11 { --rc-color: hsl(330, 85%, 60%); }
