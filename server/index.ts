@@ -77,9 +77,12 @@ io.on("connection", socket => {
             value: room.code,
             version: room.version
         })
-
-
     })
+
+    socket.on("cursor:move", (payload) => {
+        socket.to(payload.roomId).emit("cursor:update", payload);
+      });
+      
 
     socket.on("disconnect", () => {
         console.log("user disconnected", socket.id);

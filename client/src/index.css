@@ -66,3 +66,13 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.remote-selection {
+  background: rgba(80, 150, 255, 0.25);
+}
+
+.remote-cursor-after {
+  border-left: 2px solid rgba(255, 80, 80, 0.9);
+  margin-left: -1px;
+}
+
